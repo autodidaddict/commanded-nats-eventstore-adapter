@@ -25,6 +25,8 @@ defmodule Commanded.NatsTestCase do
       start_supervised!(child)
     end
 
+    :timer.sleep(1000)
+
     {:ok, event_store_meta}
   end
 end

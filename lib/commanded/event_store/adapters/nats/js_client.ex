@@ -47,37 +47,33 @@ defmodule Commanded.EventStore.Adapters.Nats.JsClient do
   end
 
   def read_stream(stream_name, start_version, batch_size) do
-    consumer_name = "reader"
 
     consumer = %Consumer{
       stream_name: stream_name,
-      durable_name: consumer_name,
+      #durable_name: consumer_name,
       deliver_policy: :by_start_sequence,
       opt_start_seq: start_version
     }
 
-    {:ok, _response} = Consumer.create(:gnat_cesa, consumer)
-    {:ok, pid} = PullConsumer.start_link(stream_name: stream_name, consumer_name: consumer_name)
+    t = Task.async(fn ->
+      {:ok, %{name: name}} = Consumer.create(:gnat_cesa, consumer)
+      IO.inspect(name)
 
-    # reply = "_INBOX." <> nuid()
+      {:ok, pid} = PullConsumer.start_link(
+        stream_name: stream_name,
+        target: self(),
+        consumer_name: name,
+        count: batch_size)
 
-    # with {:ok, consumer} <-
-    #        Gnat.Jetstream.API.Consumer.create(:gnat_cesa, %Consumer{
-    #          stream_name: stream_name,
-    #          deliver_policy: :by_start_sequence,
-    #          opt_start_seq: start_version
-    #        }) do
-    #   {:ok, sub} = Gnat.sub(gnat, self(), reply)
-    #   {:ok, agent} = Agent.start_link(fn -> [] end)
+      receive do
+        m -> m
+      after 500 ->
+        state = :sys.get_state(pid)
+        state.mod_state.state.msgs
+      end
+    end)
 
-    #   gather_messages(agent, stream_name, reply, batch_size)
-
-    #   # Gnat.unsub(gnat, sub)
-    # else
-    #   e ->
-    #     {:error,
-    #      "Failed to create an ephemeral consumer for " <> stream_name <> ": " <> inspect(e)}
-    # end
+    Task.await(t, 1_000)
   end
 
   defp nuid(), do: :crypto.strong_rand_bytes(12) |> Base.encode64()

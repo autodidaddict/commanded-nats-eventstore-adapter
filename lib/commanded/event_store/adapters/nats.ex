@@ -18,7 +18,6 @@ defmodule Commanded.EventStore.Adapters.Nats do
 
   @impl Commanded.EventStore.Adapter
   def child_spec(application, config) do
-    IO.inspect(config)
 
     event_store =
       case Keyword.get(config, :name) do
@@ -43,16 +42,17 @@ defmodule Commanded.EventStore.Adapters.Nats do
       ]
     }
 
+    # the order of these is critical
     child_spec = [
+      Supervisor.child_spec(
+        {Gnat.ConnectionSupervisor, gnat_supervisor_settings},
+        id: :cesa_gnat_supervisor
+      ),
       Supervisor.child_spec(
         {Commanded.EventStore.Adapters.Nats.Supervisor,
          Keyword.put(config, :event_store, event_store)},
         id: event_store
       ),
-      Supervisor.child_spec(
-        {Gnat.ConnectionSupervisor, gnat_supervisor_settings},
-        id: :cesa_gnat_supervisor
-      )
     ]
 
     adapter_meta = %{
